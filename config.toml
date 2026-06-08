@@ -1,0 +1,295 @@
+# B站视频随机推送 & 视频内容问答插件
+# 功能:
+#   1. 随机间隔从B站热门池中随机抽取视频，以QQ小程序卡片格式推送到群聊
+#   2. 点击卡片直接跳转QQ内的B站小程序观看
+#   3. 群友提问视频内容时拉取简介/字幕/评论，由LLM概括回答
+#   4. 支持关键词搜索B站视频并推送结果
+# 参考: google_search 插件结构
+# 适用: maibot 框架
+
+[plugin]
+name = "bilibili_trending"
+version = "2.0.0"
+config_version = "4.0.0"
+enabled = true
+description = "B站视频随机推送(QQ小程序卡片) + 视频内容问答"
+
+# ====== 模型配置 ======
+[models]
+# 回复生成模型
+model_name = "replyer"
+temperature = 0.7
+context_time_gap = 600
+context_max_limit = 20
+llm_timeout_seconds = 60
+
+# 视频总结模型
+[models.summarizer]
+model_name = "replyer"
+temperature = 0.5
+context_time_gap = 300
+context_max_limit = 5
+llm_timeout_seconds = 90
+
+# ====== 随机推送配置 ======
+[random_push]
+enabled = true
+# 随机推送间隔 (分钟)，每次推送后在此范围内随机取一个间隔等待
+min_interval_minutes = 60     # 最短间隔 1 小时
+max_interval_minutes = 240    # 最长间隔 4 小时
+# 每次随机推送数量，在此范围内随机
+min_count = 1
+max_count = 3
+# 活跃时间段 (此时间段内才推送, 格式 HH:MM-HH:MM, 空数组=全天推送)
+active_hours = ["08:00-23:00"]
+# 静默时段不推送 (如凌晨)，与 active_hours 取交集
+quiet_hours = ["23:00-08:00"]
+
+# 视频池来源
+[random_push.pool]
+# 同时拉取多个榜单混入候选池
+sources = [
+    { type = "popular", weight = 50 },       # 综合热门, 权重50
+    { type = "ranking", rid = 0, weight = 30 },  # 全站排行榜, 权重30
+    { type = "weekly", weight = 20 },        # 每周必看, 权重20
+]
+# 候选池大小 (从各榜单拉取TopN混入池中)
+pool_size = 50
+# 随机算法: weighted(按来源权重) / shuffle(纯随机打乱) / roulette(轮盘赌按播放量加权)
+pick_algorithm = "roulette"
+# 去重: 24小时内推过的视频不再重复推送
+dedup_window_hours = 24
+
+# ====== 手动触发配置 ======
+[triggers]
+commands = [
+    "/b站来一个",               # 随机推一个视频
+    "/b站热门",                  # 手动获取当前B站热门
+    "/b站排行榜 [分区]",         # 查看排行榜, 如 /b站排行榜 游戏
+    "/b站搜索 <关键词>",         # 搜索B站视频
+    "/b站视频 <BV号>",           # 查询特定视频详情
+    "/b站问答 <BV号> <问题>",    # 针对特定视频提问
+    "/b站开关",                  # 切换本群随机推送开关
+    "/b站状态",                  # 查看当前推送状态
+]
+
+# ====== B站API后端配置 ======
+[bilibili_backend]
+api_base = "https://api.bilibili.com"
+timeout = 15
+max_retries = 3
+request_interval_ms = 500
+
+# 各API端点
+popular_api = "/x/web-interface/popular"
+ranking_api = "/x/web-interface/ranking/v2"
+video_info_api = "/x/web-interface/view"
+subtitle_api = "/x/player/v2"
+comment_api = "/x/v2/reply/main"
+search_api = "/x/web-interface/search/type"
+weekly_api = "/x/web-interface/popular/series/one"
+# 用户投稿视频列表 (用于获取UP主最新视频)
+user_videos_api = "/x/space/wbi/arc/search"
+# 视频页HTML (回退方案)
+video_page = "https://www.bilibili.com/video/"
+
+# 排行榜分区
+[bilibili_backend.regions]
+all = 0
+animation = 1
+music = 3
+game = 4
+entertainment = 5
+tech = 36
+kichiku = 119
+dance = 129
+cinephile = 181
+fashion = 155
+life = 160
+food = 211
+sports = 234
+car = 223
+animal = 217
+knowledge = 36
+
+# ====== QQ小程序卡片配置 ======
+# QQ官方格式：B站分享卡片，点击直接跳转QQ内的B站小程序
+[qq_card]
+enabled = true
+# 卡片类型: miniapp(小程序卡片) / ark(ARK卡片) / share(分享卡片)
+card_type = "miniapp"
+
+# B站QQ小程序信息
+[qq_card.miniapp]
+# B站QQ小程序AppID (固定值)
+appid = "1108338344"
+# 小程序名称
+app_name = "哔哩哔哩"
+# 小程序图标URL
+app_icon = "https://i0.hdslb.com/bfs/archive/9d9d3a7d4c4c8c5b8e3f1a2b3c4d5e6f7a8b9c0d.png"
+# 跳转Scheme (QQ内打开B站小程序的视频页)
+# 变量: {bvid} 会被替换为实际BV号
+scheme_template = "mqqapi://microapp/open?appid=1108338344&url=bilibili://video/{bvid}&version=1.0"
+# 备选跳转URL (打开B站网页版)
+web_url_template = "https://b23.tv/{bvid}"
+
+# 卡片内容模板
+[qq_card.content]
+# 卡片标题 (最多24个中文字符, 超出截断)
+title_template = "{title}"
+# 卡片副标题/描述 (最多40个中文字符)
+desc_template = "UP主: {author} | {play}播放 | {danmaku}弹幕"
+# 卡片底部来源标识
+source_text = "哔哩哔哩"
+# 卡片预览图 (B站视频封面, 优先480p)
+preview_template = "{cover}@480w_300h.jpg"
+
+# ARK卡片 (备选方案, 部分QQ版本/框架使用)
+[qq_card.ark]
+enabled = true
+ark_template = """
+{
+  "app": "com.tencent.structmsg",
+  "config": {
+    "ctime": {timestamp},
+    "token": "{bvid}"
+  },
+  "meta": {
+    "news": {
+      "title": "{title}",
+      "desc": "{author} · {play}播放 · {danmaku}弹幕",
+      "preview": "{cover}",
+      "jumpUrl": "https://b23.tv/{bvid}",
+      "tag": "哔哩哔哩",
+      "sourceIcon": "https://www.bilibili.com/favicon.ico",
+      "sourceName": "bilibili"
+    }
+  }
+}
+"""
+
+# 文本回退 (不支持卡片的环境降级为文本消息)
+[qq_card.fallback]
+enabled = true
+fallback_template = """
+🎬 {title}
+👤 {author}
+▶️ {play}播放 | 💬 {danmaku}弹幕 | 👍 {like}点赞
+🔗 https://b23.tv/{bvid}
+"""
+
+# ====== 代理与请求头 ======
+[network]
+proxy = ""
+user_agents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+]
+cookie = "SESSDATA=957d9384%2C1792060937%2C3f93d%2A41CjD5PQA6g3rs4LHhVkRUMWJC8-x8mTsl25ygkn8EWwc3mvFkk5vRwWZ_BNTyDKonT2USVkZ1WmZoQzg5ZVdZa2VsWHByS2VqYWVEck9vRWhZeW9vSUZzSXlnaTQyTC1XZWlqME15RVhsaTkwWUtDWnpickhHVW40QzZaSWVNbmh3c2Y5bWdVQXNBIIEC;bili_jct=2ebab6543c17e0dd814fc09827915ef0;DedeUserID=678190625"
+use_mobile_api = false
+
+# ====== 视频内容抓取 ======
+[content_fetch]
+enabled = true
+fetch_description = true
+fetch_subtitle = true
+fetch_comments = true
+max_comments = 20
+max_content_length = 5000
+content_timeout = 15
+
+# ====== 问答配置 ======
+[qna]
+enabled = true
+auto_detect_bvid = true
+auto_detect_keywords = [
+    "这个视频", "讲了什么", "好看吗", "值得看吗",
+    "总结一下", "概括", "评价", "内容", "介绍",
+    "值得吗", "推荐吗", "怎么样", "什么内容"
+]
+# 问答回复 (文本格式, 小程序卡片无法承载长文本问答)
+reply_template = """
+📺 关于《{title}》
+
+{summary}
+
+📊 ▶️ {play} | 👍 {like} | ⭐ {favorite} | 💬 {reply}
+🔗 https://b23.tv/{bvid}
+"""
+
+# ====== 群组绑定 ======
+[groups]
+bindings = []
+respond_all = true
+blacklist = []
+push_targets = []
+# 按群独立控制随机推送开关 (群主动发送 /b站开关 切换)
+per_group_toggle = true
+
+# ====== 限流控制 ======
+[rate_limit]
+per_group_per_minute = 5
+per_user_per_minute = 3
+api_per_minute = 30
+cache_ttl = 300
+
+# ====== 过滤配置 ======
+[filters]
+title_blacklist = []
+# 最低播放量
+min_play_count = 5000
+# 分区白名单 (空=全部)
+region_whitelist = []
+# 最低点赞率 (点赞/播放) — 过滤水视频
+min_like_ratio = 0.005
+# 最长视频时长 (秒) — 太长的视频不适合碎片观看
+max_duration_seconds = 1800
+
+# ====== LLM提示词 ======
+[prompts]
+summarize_system = "你是一个B站视频内容总结助手。根据提供的视频信息（标题、简介、字幕、热门评论），生成一段简洁准确的视频内容概括。概括应包含：1.视频主题 2.核心内容/亮点 3.适合什么人群观看。控制在200字以内，语气轻松自然。"
+
+qna_system = "你是一个B站视频内容问答助手。根据提供的视频信息回答用户关于视频的问题。如果信息不足以回答，诚实告知。回答简洁准确，不要编造没有的信息。"
+
+search_system = "你是一个B站视频搜索助手。帮助用户找到他们感兴趣的视频。"
+
+summarize_user = """
+请概括以下B站视频的内容：
+
+标题: {title}
+UP主: {author}
+简介: {description}
+字幕片段: {subtitle}
+热门评论: {comments}
+
+请生成视频内容概括：
+"""
+
+qna_user = """
+关于以下B站视频，用户提出了问题：
+
+视频标题: {title}
+UP主: {author}
+简介: {description}
+字幕片段: {subtitle}
+热门评论: {comments}
+
+用户问题: {question}
+
+请根据以上信息回答用户的问题：
+"""
+
+# ====== 高级配置 ======
+[advanced]
+send_cover_image = true
+cover_max_width = 480
+cover_max_height = 360
+fallback_html_parse = true
+log_level = "info"
+stats_enabled = true
+# 视频数据预缓存 (提前拉取视频详情, 推送时更快)
+prefetch_enabled = true
+# 预缓存刷新间隔 (分钟)
+prefetch_interval_minutes = 30

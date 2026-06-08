@@ -1,0 +1,43 @@
+{
+  "manifest_version": 2,
+  "version": "2.0.0",
+  "name": "B站视频随机推送",
+  "description": "B站视频随机推送(QQ小程序卡片) + 视频内容问答",
+  "author": {
+    "name": "洛子",
+    "url": "https://github.com/luozi"
+  },
+  "license": "MIT",
+  "urls": {
+    "repository": "https://github.com/luozi/bilibili-trending",
+    "homepage": "https://github.com/luozi/bilibili-trending",
+    "documentation": "https://github.com/luozi/bilibili-trending",
+    "issues": "https://github.com/luozi/bilibili-trending/issues"
+  },
+  "host_application": {
+    "min_version": "1.0.0",
+    "max_version": "1.0.0"
+  },
+  "sdk": {
+    "min_version": "2.0.0",
+    "max_version": "2.99.99"
+  },
+  "dependencies": [],
+  "capabilities": [
+    "send.text",
+    "send.forward",
+    "send.hybrid",
+    "network.http",
+    "schedule.task",
+    "llm.chat",
+    "config.get"
+  ],
+  "i18n": {
+    "default_locale": "zh-CN",
+    "locales_path": "_locales",
+    "supported_locales": [
+      "zh-CN"
+    ]
+  },
+  "id": "luozi.bilibili-trending"
+}
