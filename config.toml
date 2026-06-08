@@ -187,7 +187,7 @@ user_agents = [
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36",
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
 ]
-cookie = "SESSDATA=957d9384%2C1792060937%2C3f93d%2A41CjD5PQA6g3rs4LHhVkRUMWJC8-x8mTsl25ygkn8EWwc3mvFkk5vRwWZ_BNTyDKonT2USVkZ1WmZoQzg5ZVdZa2VsWHByS2VqYWVEck9vRWhZeW9vSUZzSXlnaTQyTC1XZWlqME15RVhsaTkwWUtDWnpickhHVW40QzZaSWVNbmh3c2Y5bWdVQXNBIIEC;bili_jct=2ebab6543c17e0dd814fc09827915ef0;DedeUserID=678190625"
+cookie = ""
 use_mobile_api = false
 
 # ====== 视频内容抓取 ======

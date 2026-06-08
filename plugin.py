@@ -1115,3 +1115,12 @@ class Plugin:
                 break
             except Exception:
                 await asyncio.sleep(interval)
+
+
+# ============================================================
+# v2 插件入口
+# ============================================================
+
+def create_plugin():
+    """MaiCore v2 插件工厂函数 — 返回Plugin类，框架负责实例化"""
+    return Plugin
