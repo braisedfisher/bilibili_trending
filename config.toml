@@ -8,11 +8,7 @@
 # 适用: maibot 框架
 
 [plugin]
-name = "bilibili_trending"
-version = "2.0.0"
-config_version = "4.0.0"
-enabled = true
-description = "B站视频随机推送(QQ小程序卡片) + 视频内容问答"
+config_version = "2.0.0"
 
 # ====== 模型配置 ======
 [models]
